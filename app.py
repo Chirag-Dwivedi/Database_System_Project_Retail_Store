@@ -6,12 +6,12 @@ from tkinter import messagebox
 
 matplotlib.use('TkAgg')
 
-conn = sql.connect('Database_System_Project_Retail_Store/retail_store.db')
+conn = sql.connect('retail_store.db')
 cursor = conn.cursor()
 
 root = tk.Tk()
 
-root.title('./retailer_db')
+root.title('retailer_db')
 root.geometry('500x500')
 
 # --------- FUNCTIONS ---------
