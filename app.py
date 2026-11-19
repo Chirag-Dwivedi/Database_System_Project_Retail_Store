@@ -1,587 +1,679 @@
-<<<<<<< HEAD
-import matplotlib
-import sqlite3 as sql 
-import tkinter as tk 
-import pandas as pd
-from tkinter import messagebox
+"""Simple store-management app. Database functions are in operations.py."""
 
-matplotlib.use('TkAgg')
-
-conn = sql.connect('retail_store.db')
-cursor = conn.cursor()
-
-root = tk.Tk()
-
-root.title('retailer_db')
-root.geometry('500x500')
-
-# --------- FUNCTIONS ---------
-
-def add_category():
-    cat_name = category_name.get().strip()
-    
-    if not cat_name:
-        messagebox.showerror('e', 'real vals')
-        return
-
-    inputs = (cat_name)
-
-    cursor.execute(
-        """
-        insert into Category (category_name)
-        VALUES (?)
-        """, inputs
-    )
-    conn.commit()
-
-    load_categories()
-
-def load_categories():
-    listBox.delete(0, tk.END)
-
-    cursor.execute(
-        """
-        select * from Category
-        """        
-        )
-    categories = cursor.fetchall()
-
-    for category in categories:
-        listBox.insert(0, category)
-
-def delete_category():
-    selected = listBox.curselection()
-    customer = listBox.get(selected[0])
-    id = customer[0]
-
-    cursor.execute(
-        """
-        delete from category
-        where category_id = ?
-        """, (id,)
-    )
-    conn.commit()
-
-    load_categories()
-
-
-# ---------TKinter variables--------
-
-buttonadd = tk.Button(
-    root,
-    text='Add Category',
-    command=add_category
-)
-
-buttonremove = tk.Button(
-    root,
-    text='Delete Category',
-    command=delete_category
-)
-
-
-category_name = tk.Entry(root)
-
-listBox = tk.Listbox(root, width=40)
-
-# ---------HEADERS SENT-----------
-
-load_categories()
-
-category_name.pack()
-
-buttonadd.pack()
-buttonremove.pack()
-listBox.pack()
-
-root.mainloop()
-cursor.close()
-conn.close()
-=======
-"""Tkinter UI for retailDB.py + operations.py. Run python init_retailDB.py first, then python app.py.
-No SQL or connection code belongs in this UI module.
-"""
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
+
 import operations as ops
 
-NAVY = '#111e32'
-TEAL = '#008d86'
-BG = '#f5f7fb'
-INK = '#142035'
-MUTED = '#657184'
+
+PAGES = ["Dashboard", "Products", "Categories", "Inventory",
+         "Sales", "Purchase Orders", "Suppliers", "Employees"]
+
 
 class StoreApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title('Convenience Store Manager')
-        self.geometry('1320x820')
-        self.minsize(1040, 700)
-        self.configure(bg=BG)
-        self.protocol('WM_DELETE_WINDOW', self.close)
-        self.report_callback_exception = self.callback_error
-        self.page = 'Inventory'
+        self.title("Convenience Store Manager")
+        self.geometry("1100x700")
+        self.page = "Inventory"
         self.product_filter = None
-        style = ttk.Style(self)
-        style.theme_use('clam')
-        style.configure('Treeview', font=('Segoe UI', 10), rowheight=42, background='white', fieldbackground='white', borderwidth=0)
-        style.configure('Treeview.Heading', font=('Segoe UI', 10, 'bold'), background='#edf1f6', foreground=INK, padding=10)
-        style.map('Treeview', background=[('selected','#cdece8')], foreground=[('selected',INK)])
-        style.configure('TCombobox', padding=7)
-        self.sidebar = tk.Frame(self, bg=NAVY, width=230)
-        self.sidebar.pack(side='left', fill='y')
-        self.sidebar.pack_propagate(False)
-        tk.Label(self.sidebar, text='Convenience Store\nManager', font=('Segoe UI',18,'bold'), fg='white', bg=NAVY, justify='left').pack(anchor='w', padx=22, pady=(30,8))
-        tk.Label(self.sidebar, text='Single-store management', fg='#b6c4d7', bg=NAVY, font=('Segoe UI',10)).pack(anchor='w', padx=22, pady=(0,28))
-        self.nav = {}
-        for name in ['Dashboard','Products','Categories','Inventory','Sales','Purchase Orders','Suppliers','Employees']:
-            b = tk.Button(self.sidebar, text=name, anchor='w', command=lambda n=name: self.navigate(n), font=('Segoe UI',12), fg='white', bg=NAVY, activebackground=TEAL, activeforeground='white', bd=0, padx=18, pady=13, cursor='hand2')
-            b.pack(fill='x', padx=10, pady=3)
-            self.nav[name] = b
-        tk.Label(self.sidebar, text='SQLite • Desktop application', bg=NAVY, fg='#b6c4d7', font=('Segoe UI',9)).pack(side='bottom', pady=20)
-        self.main = tk.Frame(self, bg=BG)
-        self.main.pack(side='left', fill='both', expand=True, padx=26, pady=24)
-        self.navigate('Inventory')
 
-    def callback_error(self, kind, error, traceback):
-        messagebox.showerror('Action failed', str(error), parent=self)
+        # Navigation
+        sidebar = tk.Frame(self)
+        sidebar.pack(side="left", fill="y", padx=10, pady=10)
 
-    def close(self):
-        self.destroy()
+        tk.Label(sidebar, text="Store Manager",
+                 font=("Arial", 18, "bold")).pack(pady=10)
 
-    def button(self, parent, text, command, primary=False):
-        b = tk.Button(parent, text=text, command=command, bg=TEAL if primary else 'white', fg='white' if primary else TEAL, activebackground='#dcefeb', relief='flat', font=('Segoe UI',10,'bold'), padx=16, pady=10, cursor='hand2', highlightbackground='#ccd6df', highlightthickness=1)
-        return b
+        for page in PAGES:
+            tk.Button(sidebar, text=page, width=18,
+                      command=lambda p=page: self.open_page(p)).pack(fill="x")
 
-    def label(self, parent, text, size=11, bold=False, color=INK, bg=BG):
-        return tk.Label(parent, text=text, font=('Segoe UI',size,'bold' if bold else 'normal'), fg=color, bg=bg, anchor='w')
+        self.content = tk.Frame(self)
+        self.content.pack(side="left", fill="both", expand=True, padx=15, pady=15)
+        self.open_page("Inventory")
 
-    def navigate(self, page, product_id=None):
-        self.page, self.product_filter = page, product_id
-        for name, b in self.nav.items():
-            b.configure(bg=TEAL if name == page else NAVY)
-        for child in self.main.winfo_children():
-            child.destroy()
-        header = tk.Frame(self.main, bg=BG)
-        header.pack(fill='x')
-        self.label(header, page, 28, True).pack(side='left')
-        self.button(header, 'Refresh', lambda: self.navigate(self.page, self.product_filter)).pack(side='right')
-        if page in ('Inventory','Products'):
-            self.button(header, '+ Add Product', self.product_form, True).pack(side='right', padx=10)
-        self.label(self.main, {'Inventory':'Track stock and reorder products', 'Products':'Manage your product catalog', 'Dashboard':'Your store at a glance'}.get(page, 'Manage your store records'), color=MUTED).pack(fill='x', pady=(4,20))
-        if page in ('Inventory','Products','Dashboard'):
-            self.cards()
-        if page in ('Inventory','Products'):
-            self.inventory_page()
-        elif page == 'Dashboard':
-            self.label(self.main, 'Products needing attention', 16, True).pack(anchor='w', pady=(20,10))
-            rows = [tuple(row.values()) for row in ops.get_low_stock()]
-            self.table(self.main, ['Product','In Stock','Reorder At'], rows)
-            self.button(self.main, 'Open Inventory', lambda: self.navigate('Inventory'), True).pack(anchor='w', pady=15)
-        else:
-            self.records_page()
-        self.label(self.main, 'Database: retail_store.db', 9, color=MUTED).pack(side='bottom', anchor='e', pady=(8,0))
+    # ---------- Common helpers ----------
 
-    def cards(self):
-        summary = ops.get_dashboard()
-        counts = [summary[key] for key in ('products','low_stock','out_of_stock','categories')]
-        frame = tk.Frame(self.main,bg=BG)
-        frame.pack(fill='x', pady=(0,20))
-        for i,(title,value,color) in enumerate(zip(['Products','Low Stock','Out of Stock','Categories'],counts,[TEAL,'#ad6800','#bd3333',TEAL])):
-            frame.columnconfigure(i, weight=1, uniform='cards')
-            card = tk.Frame(frame,bg='white',highlightbackground='#d9e0e8',highlightthickness=1)
-            card.grid(row=0,column=i,sticky='ew',padx=(0,10 if i<3 else 0))
-            self.label(card,title,10,True,bg='white').pack(anchor='w',padx=15,pady=(15,0))
-            self.label(card,str(value),25,True,color,bg='white').pack(anchor='w',padx=15,pady=(2,15))
+    def clear_page(self):
+        for widget in self.content.winfo_children():
+            widget.destroy()
 
-    def table(self, parent, columns, rows, height=10):
-        box = tk.Frame(parent,bg='white')
-        box.pack(fill='both',expand=True)
-        tree = ttk.Treeview(box,columns=list(range(len(columns))),show='headings',height=height)
-        for i,name in enumerate(columns):
-            tree.heading(i,text=name)
-            tree.column(i,width=130,minwidth=70,anchor='w')
-        tree.pack(side='left',fill='both',expand=True)
-        scroll = ttk.Scrollbar(box,orient='vertical',command=tree.yview)
-        scroll.pack(side='right',fill='y')
-        tree.configure(yscrollcommand=scroll.set)
-        horizontal = ttk.Scrollbar(parent,orient='horizontal',command=tree.xview)
-        horizontal.pack(fill='x')
-        tree.configure(xscrollcommand=horizontal.set)
+    def button(self, parent, text, command):
+        return tk.Button(parent, text=text, command=command)
+
+    def table(self, parent, columns, rows, height=12):
+        frame = tk.Frame(parent)
+        frame.pack(fill="both", expand=True)
+
+        tree = ttk.Treeview(frame, columns=columns, show="headings",
+                            height=height)
+        for column in columns:
+            tree.heading(column, text=column.replace("_", " ").title())
+            tree.column(column, width=130)
+
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(frame, command=tree.yview)
+        scrollbar.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=scrollbar.set)
+
         for row in rows:
-            tree.insert('', 'end', values=tuple('' if x is None else x for x in row))
+            tree.insert("", "end", values=row)
+
         return tree
 
-    def inventory_page(self):
-        filters = tk.Frame(self.main,bg=BG)
-        filters.pack(fill='x',pady=(0,14))
+    def show_error(self, title, error, parent=None):
+        messagebox.showerror(title, str(error), parent=parent or self)
+
+    def open_page(self, page, product_id=None):
+        self.page = page
+        self.product_filter = product_id
+        self.clear_page()
+
+        header = tk.Frame(self.content)
+        header.pack(fill="x", pady=(0, 12))
+        tk.Label(header, text=page, font=("Arial", 22, "bold")).pack(side="left")
+        self.button(header, "Refresh",
+                    lambda: self.open_page(self.page, self.product_filter)
+                    ).pack(side="right")
+
+        if page in ("Products", "Inventory"):
+            self.button(header, "Add Product", self.product_form).pack(side="right")
+
+        if page == "Dashboard":
+            self.show_dashboard()
+        elif page in ("Products", "Inventory"):
+            self.show_inventory()
+        else:
+            self.show_records()
+
+    # ---------- Dashboard ----------
+
+    def show_dashboard(self):
+        summary = ops.get_dashboard()
+
+        for key in ("products", "low_stock", "out_of_stock", "categories"):
+            text = f"{key.replace('_', ' ').title()}: {summary[key]}"
+            tk.Label(self.content, text=text, font=("Arial", 13)).pack(anchor="w")
+
+        tk.Label(self.content, text="Products needing attention",
+                 font=("Arial", 15, "bold")).pack(anchor="w", pady=(20, 5))
+
+        rows = [(r["product_name"], r["quantity_on_hand"], r["reorder_level"])
+                for r in ops.get_low_stock()]
+        self.table(self.content, ["Product", "In Stock", "Reorder At"], rows)
+
+    # ---------- Products and inventory ----------
+
+    def show_inventory(self):
+        filters = tk.Frame(self.content)
+        filters.pack(fill="x", pady=5)
+
         self.search = tk.StringVar()
-        self.category = tk.StringVar(value='All Categories')
-        self.stock = tk.StringVar(value='All Stock Levels')
-        self.categories = {str(r['category_id'])+' • '+r['category_name']:r['category_id'] for r in ops.get_categories()}
-        entry = ttk.Entry(filters,textvariable=self.search,font=('Segoe UI',11))
-        entry.pack(side='left',fill='x',expand=True,ipady=7)
-        entry.bind('<Return>',lambda event:self.load_inventory())
-        self.button(filters,'Search',self.load_inventory).pack(side='left',padx=6)
-        for variable,values in [(self.category,['All Categories',*self.categories]),(self.stock,['All Stock Levels','In Stock','Low Stock','Out of Stock','Missing Inventory'])]:
-            combo = ttk.Combobox(filters,textvariable=variable,values=values,state='readonly',width=20)
-            combo.pack(side='left',padx=4)
-            combo.bind('<<ComboboxSelected>>',lambda event:self.load_inventory())
-        self.tree = self.table(self.main,['ID','Product Name','Category','Price','In Stock','Reorder At','Status'],[])
-        self.tree.column(1,width=210)
-        self.tree.column(0,width=70)
-        self.tree.tag_configure('Low Stock',foreground='#996000')
-        self.tree.tag_configure('Out of Stock',foreground='#ba3030')
-        self.tree.bind('<<TreeviewSelect>>',self.select_product)
-        self.tree.bind('<Double-1>',lambda event:self.edit_selected())
-        panel = tk.Frame(self.main,bg='white',highlightbackground='#d9e0e8',highlightthickness=1)
-        panel.pack(fill='x',pady=(20,4))
-        self.selection_label = self.label(panel,'Select a product to manage its stock',14,True,bg='white')
-        self.selection_label.pack(anchor='w',padx=16,pady=(16,8))
-        actions = tk.Frame(panel,bg='white')
-        actions.pack(fill='x',padx=16,pady=(0,16))
-        for text,command in [('Adjust Stock',self.adjust_stock),('Edit Product',self.edit_selected),('View Sales',self.view_sales),('Delete Product',self.delete_product)]:
-            self.button(actions,text,command, text=='Adjust Stock').pack(side='left',padx=(0,8))
-        self.row_count = self.label(self.main,'',9,color=MUTED)
-        self.row_count.pack(anchor='w')
+        self.category = tk.StringVar(value="All Categories")
+        self.stock = tk.StringVar(value="All Stock Levels")
+
+        self.categories = {
+            f'{r["category_id"]} - {r["category_name"]}': r["category_id"]
+            for r in ops.get_categories()
+        }
+
+        search_box = ttk.Entry(filters, textvariable=self.search)
+        search_box.pack(side="left", fill="x", expand=True)
+        search_box.bind("<Return>", lambda event: self.load_inventory())
+        self.button(filters, "Search", self.load_inventory).pack(side="left")
+
+        category_box = ttk.Combobox(
+            filters, textvariable=self.category,
+            values=["All Categories", *self.categories], state="readonly"
+        )
+        category_box.pack(side="left", padx=5)
+        category_box.bind("<<ComboboxSelected>>",
+                          lambda event: self.load_inventory())
+
+        stock_options = ["All Stock Levels", "In Stock", "Low Stock",
+                         "Out of Stock", "Missing Inventory"]
+        stock_box = ttk.Combobox(filters, textvariable=self.stock,
+                                 values=stock_options, state="readonly")
+        stock_box.pack(side="left")
+        stock_box.bind("<<ComboboxSelected>>",
+                       lambda event: self.load_inventory())
+
+        columns = ["ID", "Product Name", "Category", "Price",
+                   "In Stock", "Reorder At", "Status"]
+        self.products_table = self.table(self.content, columns, [])
+        self.products_table.bind("<<TreeviewSelect>>", self.show_selection)
+        self.products_table.bind("<Double-1>",
+                                 lambda event: self.edit_product())
+
+        self.selection_text = tk.StringVar(value="Select a product")
+        tk.Label(self.content, textvariable=self.selection_text).pack(anchor="w",
+                                                                     pady=8)
+
+        actions = tk.Frame(self.content)
+        actions.pack(fill="x")
+        for text, action in [
+            ("Adjust Stock", self.adjust_stock),
+            ("Edit", self.edit_product),
+            ("View Sales", self.view_sales),
+            ("Delete", self.delete_product),
+        ]:
+            self.button(actions, text, action).pack(side="left", padx=3)
+
+        self.count_text = tk.StringVar()
+        tk.Label(self.content, textvariable=self.count_text).pack(anchor="w")
         self.load_inventory()
 
     def load_inventory(self):
-        selected = self.tree.selection()
-        previous = selected[0] if selected else None
-        self.tree.delete(*self.tree.get_children())
-        rows = ops.get_products()
-        for row in rows:
-            quantity,level = row['quantity_on_hand'],row['reorder_level']
-            status = 'Missing Inventory' if quantity is None else 'Out of Stock' if quantity==0 else 'Low Stock' if quantity<=level else 'In Stock'
-            query = self.search.get().strip().casefold()
-            if query and query not in f"{row['product_name']} {row['barcode'] or ''} {row['product_id']}".casefold():
-                continue
-            if self.category.get() in self.categories and row['category_id']!=self.categories[self.category.get()]:
-                continue
-            if self.stock.get() != 'All Stock Levels' and self.stock.get()!=status:
-                continue
-            self.tree.insert('','end',iid=str(row['product_id']),values=(row['product_id'],row['product_name'],row['category_name'] or 'Uncategorized',f"${row['selling_price']:.2f}",quantity if quantity is not None else '—',level if level is not None else '—',status),tags=(status,))
-        children = self.tree.get_children()
-        self.row_count.configure(text=f'{len(children)} products shown • Double-click a row to edit')
-        if children:
-            self.tree.selection_set(previous if previous in children else children[0])
-        else:
-            self.selection_label.configure(text='No matching products')
+        tree = self.products_table
+        tree.delete(*tree.get_children())
 
-    def selected_id(self):
-        rows = self.tree.selection()
-        if not rows:
-            messagebox.showinfo('Select a product','Choose a product row first.',parent=self)
+        for r in ops.get_products():
+            qty = r["quantity_on_hand"]
+            reorder = r["reorder_level"]
+
+            if qty is None:
+                status = "Missing Inventory"
+            elif qty == 0:
+                status = "Out of Stock"
+            elif qty <= reorder:
+                status = "Low Stock"
+            else:
+                status = "In Stock"
+
+            search_text = f'{r["product_name"]} {r["barcode"] or ""} {r["product_id"]}'
+            if self.search.get().lower() not in search_text.lower():
+                continue
+
+            category_id = self.categories.get(self.category.get())
+            if category_id and r["category_id"] != category_id:
+                continue
+            if self.stock.get() not in ("All Stock Levels", status):
+                continue
+
+            tree.insert("", "end", iid=str(r["product_id"]), values=(
+                r["product_id"], r["product_name"],
+                r["category_name"] or "Uncategorized",
+                f'${r["selling_price"]:.2f}',
+                qty if qty is not None else "-",
+                reorder if reorder is not None else "-",
+                status
+            ))
+
+        self.count_text.set(f"{len(tree.get_children())} products shown")
+
+    def selected_product(self):
+        selected = self.products_table.selection()
+        if not selected:
+            messagebox.showinfo("Select Product", "Select a product first.")
             return None
-        return int(rows[0])
+        return int(selected[0])
 
-    def select_product(self,event=None):
-        selected = self.tree.selection()
+    def show_selection(self, event=None):
+        selected = self.products_table.selection()
         if selected:
-            values = self.tree.item(selected[0],'values')
-            self.selection_label.configure(text=f'Selected: {values[1]}    •    Stock: {values[4]}    •    Reorder at: {values[5]}')
+            values = self.products_table.item(selected[0], "values")
+            self.selection_text.set(
+                f"Selected: {values[1]} | Stock: {values[4]} | "
+                f"Reorder at: {values[5]}"
+            )
 
-    def edit_selected(self):
-        product_id = self.selected_id()
+    def edit_product(self):
+        product_id = self.selected_product()
         if product_id is not None:
             self.product_form(product_id)
 
     def product_form(self, product_id=None):
-        row = ops.get_product(product_id) if product_id is not None else None
-        choices = {f"{r['category_id']} • {r['category_name']}":r['category_id'] for r in ops.get_categories()}
-        win = tk.Toplevel(self)
-        win.title('Edit Product' if row else 'Add Product')
-        win.geometry('450x530')
-        win.resizable(False,False)
-        win.configure(bg=BG)
-        win.transient(self)
-        win.grab_set()
+        row = ops.get_product(product_id) if product_id else None
+        categories = {
+            f'{r["category_id"]} - {r["category_name"]}': r["category_id"]
+            for r in ops.get_categories()
+        }
+
+        window = tk.Toplevel(self)
+        window.title("Edit Product" if row else "Add Product")
+        window.geometry("400x470")
+        window.transient(self)
+        window.grab_set()
+
         fields = {}
-        specs = [('Product name',row['product_name'] if row else ''),('Barcode',row['barcode'] or '' if row else ''),('Selling price',str(row['selling_price']) if row else '0.00'),('Category',next((k for k,v in choices.items() if row and v==row['category_id']),next(iter(choices),''))),('Reorder level',str(row['reorder_level'] if row and row['reorder_level'] is not None else 5))]
-        if not row:
-            specs.append(('Initial quantity','0'))
-        for label,value in specs:
-            self.label(win,label,10,True).pack(anchor='w',padx=24,pady=(10,3))
-            variable = tk.StringVar(value=value)
-            fields[label] = variable
-            widget = ttk.Combobox(win,textvariable=variable,values=list(choices),state='readonly') if label=='Category' else ttk.Entry(win,textvariable=variable)
-            widget.pack(fill='x',padx=24,ipady=4)
-            if label == 'Category':
-                category_widget = widget
+        defaults = {
+            "Product name": row["product_name"] if row else "",
+            "Barcode": (row["barcode"] or "") if row else "",
+            "Selling price": str(row["selling_price"]) if row else "0.00",
+            "Category": next(
+                (name for name, cid in categories.items()
+                 if row and cid == row["category_id"]),
+                next(iter(categories), "")
+            ),
+            "Reorder level": str(
+                row["reorder_level"] if row and
+                row["reorder_level"] is not None else 5
+            ),
+        }
+        if row is None:
+            defaults["Initial quantity"] = "0"
+
+        for name, default in defaults.items():
+            tk.Label(window, text=name).pack(anchor="w", padx=15, pady=(8, 2))
+            value = tk.StringVar(value=default)
+            fields[name] = value
+
+            if name == "Category":
+                category_box = ttk.Combobox(
+                    window, textvariable=value, values=list(categories),
+                    state="readonly"
+                )
+                category_box.pack(fill="x", padx=15)
+            else:
+                ttk.Entry(window, textvariable=value).pack(fill="x", padx=15)
+
         def add_category():
-            name = simpledialog.askstring('Create Category','Category name:',parent=win)
+            name = simpledialog.askstring("New Category", "Category name:",
+                                          parent=window)
             if not name or not name.strip():
                 return
             try:
-                category_id = ops.save_record('Categories', {'category_name': name})
-                key = f'{category_id} • {name.strip()}'
-                choices[key] = category_id
-                category_widget.configure(values=list(choices))
-                fields['Category'].set(key)
+                category_id = ops.save_record(
+                    "Categories", {"category_name": name.strip()}
+                )
+                key = f"{category_id} - {name.strip()}"
+                categories[key] = category_id
+                category_box["values"] = list(categories)
+                fields["Category"].set(key)
             except (ValueError, sqlite3.Error) as error:
-                messagebox.showerror('Cannot create category',str(error),parent=win)
-        self.button(win,'+ Create Category',add_category,False).pack(anchor='w',padx=24,pady=10)
+                self.show_error("Cannot Add Category", error, window)
+
+        self.button(window, "Add Category", add_category).pack(pady=8)
+
         def save():
             try:
-                name = fields['Product name'].get().strip()
+                name = fields["Product name"].get().strip()
+                category_id = categories.get(fields["Category"].get())
                 if not name:
-                    raise ValueError('Enter a product name.')
-                category = choices.get(fields['Category'].get())
-                if category is None:
-                    raise ValueError('Choose a category. Create one first if none exist.')
-                price = ops.money(fields['Selling price'].get())
-                reorder = ops.integer(fields['Reorder level'].get(),'Reorder level')
-                barcode = fields['Barcode'].get().strip() or None
-                quantity = ops.integer(fields['Initial quantity'].get(),'Initial quantity') if not row else 0
-                ops.save_product(name,barcode,category,price,reorder,product_id,quantity)
-            except (ValueError,sqlite3.Error) as error:
-                messagebox.showerror('Cannot save',str(error),parent=win)
+                    raise ValueError("Enter a product name.")
+                if category_id is None:
+                    raise ValueError("Choose a category.")
+
+                initial_qty = (
+                    ops.integer(fields["Initial quantity"].get(),
+                                "Initial quantity")
+                    if row is None else 0
+                )
+
+                ops.save_product(
+                    name,
+                    fields["Barcode"].get().strip() or None,
+                    category_id,
+                    ops.money(fields["Selling price"].get()),
+                    ops.integer(fields["Reorder level"].get(), "Reorder level"),
+                    product_id,
+                    initial_qty
+                )
+            except (ValueError, sqlite3.Error) as error:
+                self.show_error("Cannot Save Product", error, window)
                 return
-            win.destroy()
-            self.navigate(self.page)
-        self.button(win,'Save Product',save,True).pack(fill='x',padx=24,pady=10)
+
+            window.destroy()
+            self.open_page(self.page)
+
+        self.button(window, "Save", save).pack(fill="x", padx=15, pady=12)
 
     def adjust_stock(self):
-        product_id = self.selected_id()
+        product_id = self.selected_product()
         if product_id is None:
             return
-        change = simpledialog.askinteger('Adjust Stock','Quantity change (e.g. 10 or -2):',parent=self)
+
+        change = simpledialog.askinteger(
+            "Adjust Stock", "Quantity change (example: 10 or -2):",
+            parent=self
+        )
         if change is None:
             return
+
         try:
-            ops.adjust_stock(product_id,change)
-        except (ValueError,sqlite3.Error) as error:
-            messagebox.showerror('Cannot adjust stock',str(error),parent=self)
-            return
-        self.navigate(self.page)
+            ops.adjust_stock(product_id, change)
+            self.open_page(self.page)
+        except (ValueError, sqlite3.Error) as error:
+            self.show_error("Cannot Adjust Stock", error)
 
     def delete_product(self):
-        product_id = self.selected_id()
-        if product_id is None or not messagebox.askyesno('Delete Product','Delete this product and its inventory row? Products referenced by sales or purchase orders cannot be deleted.',parent=self):
+        product_id = self.selected_product()
+        if product_id is None:
             return
+        if not messagebox.askyesno("Delete Product", "Delete this product?"):
+            return
+
         try:
             ops.delete_product(product_id)
+            self.open_page(self.page)
         except sqlite3.IntegrityError:
-            messagebox.showerror('Cannot delete','This product is referenced by a sale or purchase order. Its data has been retained.',parent=self)
-            return
-        self.navigate(self.page)
+            messagebox.showerror(
+                "Cannot Delete",
+                "This product is used by a sale or purchase order."
+            )
 
     def view_sales(self):
-        product_id = self.selected_id()
+        product_id = self.selected_product()
         if product_id is not None:
-            self.navigate('Sales',product_id)
+            self.open_page("Sales", product_id)
 
-    def records_page(self):
+    # ---------- Categories, suppliers, employees, sales, orders ----------
+
+    def show_records(self):
         entity = self.page
-        if entity in ops.ENTITIES:
-            table, pk, columns = ops.ENTITIES[entity]
-            names = [pk, *columns]
-            rows = ops.get_records(entity)
-        elif entity == 'Sales':
-            names = ['sale_id','sale_datetime','employee_id','payment_method','tax_amount']
-            rows = ops.get_sales(self.product_filter)
-        else:
-            names = ['purchase_order_id','supplier_name','order_date','status']
-            rows = ops.get_purchase_orders()
-        if entity == 'Sales' and self.product_filter is not None:
-            self.label(self.main,f'Filtered to product #{self.product_filter}',color=TEAL).pack(anchor='w')
-        tree = self.table(self.main,[n.replace('_',' ').title() for n in names],[tuple(r[n] for n in names) for r in rows])
-        self.label(self.main,f'{len(rows)} records',9,color=MUTED).pack(anchor='w',pady=8)
-        actions = tk.Frame(self.main,bg=BG)
-        actions.pack(fill='x',pady=10)
-        def selected():
-            ids = tree.selection()
-            if not ids:
-                messagebox.showinfo('Select a record','Choose a row first.',parent=self)
-                return None
-            return int(tree.item(ids[0],'values')[0])
-        if entity in ops.ENTITIES:
-            self.button(actions,'+ Add',lambda:self.record_form(entity),True).pack(side='left',padx=5)
-            def edit():
-                record_id = selected()
-                if record_id is not None:
-                    self.record_form(entity,next(r for r in rows if r[names[0]]==record_id))
-            def delete():
-                record_id = selected()
-                if record_id is not None and messagebox.askyesno('Delete record','Delete the selected record? Referenced records cannot be deleted.',parent=self):
-                    try:
-                        ops.delete_record(entity,record_id)
-                        self.navigate(entity)
-                    except sqlite3.IntegrityError:
-                        messagebox.showerror('Cannot delete','Other records reference this record.',parent=self)
-            self.button(actions,'Edit',edit).pack(side='left',padx=5)
-            self.button(actions,'Delete',delete).pack(side='left',padx=5)
-            tree.bind('<Double-1>',lambda event:edit())
-        else:
-            tree.bind('<Double-1>',lambda event:self.show_line_items(tree))
-            self.button(actions,'View Line Items',lambda:self.show_line_items(tree)).pack(side='left',padx=5)
-            self.button(actions,'+ New Sale' if entity=='Sales' else '+ New Purchase Order',lambda:self.transaction_form(entity),True).pack(side='left',padx=5)
-            if entity=='Purchase Orders':
-                def cancel():
-                    order_id = selected()
-                    if order_id is not None and messagebox.askyesno('Cancel Order','Cancel this pending order?',parent=self):
-                        ops.cancel_purchase_order(order_id)
-                        self.navigate(entity)
-                def receive():
-                    order_id = selected()
-                    if order_id is not None:
-                        self.receive_form(order_id)
-                self.button(actions,'Receive Stock',receive).pack(side='left',padx=5)
-                self.button(actions,'Cancel Order',cancel).pack(side='left',padx=5)
 
-    def record_form(self,entity,row=None):
-        table,pk,columns = ops.ENTITIES[entity]
-        win = tk.Toplevel(self)
-        win.title(('Edit ' if row else 'Add ')+entity)
-        win.configure(bg=BG)
-        win.transient(self)
-        win.grab_set()
+        if entity in ops.ENTITIES:
+            _, primary_key, columns = ops.ENTITIES[entity]
+            names = [primary_key] + columns
+            records = ops.get_records(entity)
+        elif entity == "Sales":
+            names = ["sale_id", "sale_datetime", "employee_id",
+                     "payment_method", "tax_amount"]
+            records = ops.get_sales(self.product_filter)
+        else:
+            names = ["purchase_order_id", "supplier_name", "order_date", "status"]
+            records = ops.get_purchase_orders()
+
+        rows = [tuple(record[name] for name in names) for record in records]
+        tree = self.table(self.content, names, rows)
+
+        actions = tk.Frame(self.content)
+        actions.pack(fill="x", pady=10)
+
+        if entity in ops.ENTITIES:
+            self.button(actions, "Add",
+                        lambda: self.record_form(entity)).pack(side="left", padx=3)
+            self.button(actions, "Edit",
+                        lambda: self.edit_record(entity, tree, records,
+                                                 primary_key)).pack(side="left", padx=3)
+            self.button(actions, "Delete",
+                        lambda: self.delete_record(entity, tree)).pack(side="left", padx=3)
+            tree.bind("<Double-1>", lambda event: self.edit_record(
+                entity, tree, records, primary_key
+            ))
+        else:
+            self.button(actions, "View Items",
+                        lambda: self.show_line_items(tree)).pack(side="left", padx=3)
+            self.button(
+                actions, "New Sale" if entity == "Sales" else "New Purchase Order",
+                lambda: self.transaction_form(entity)
+            ).pack(side="left", padx=3)
+
+            if entity == "Purchase Orders":
+                self.button(actions, "Receive Stock",
+                            lambda: self.receive_selected(tree)).pack(side="left", padx=3)
+                self.button(actions, "Cancel Order",
+                            lambda: self.cancel_order(tree)).pack(side="left", padx=3)
+
+    def selected_record_id(self, tree):
+        selected = tree.selection()
+        if not selected:
+            messagebox.showinfo("Select Record", "Select a row first.")
+            return None
+        return int(tree.item(selected[0], "values")[0])
+
+    def edit_record(self, entity, tree, records, primary_key):
+        record_id = self.selected_record_id(tree)
+        if record_id is None:
+            return
+        row = next(record for record in records
+                   if record[primary_key] == record_id)
+        self.record_form(entity, row)
+
+    def delete_record(self, entity, tree):
+        record_id = self.selected_record_id(tree)
+        if record_id is None:
+            return
+        if not messagebox.askyesno("Delete Record", "Delete this record?"):
+            return
+        try:
+            ops.delete_record(entity, record_id)
+            self.open_page(entity)
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Cannot Delete",
+                                 "Another record uses this record.")
+
+    def record_form(self, entity, row=None):
+        _, primary_key, columns = ops.ENTITIES[entity]
+        window = tk.Toplevel(self)
+        window.title(("Edit " if row else "Add ") + entity)
+        window.transient(self)
+        window.grab_set()
+
         fields = {}
         for column in columns:
-            self.label(win,column.replace('_',' ').title()).pack(anchor='w',padx=24,pady=(12,3))
-            var = tk.StringVar(value=(row[column] or '') if row else '')
-            fields[column] = var
-            ttk.Entry(win,textvariable=var,width=40).pack(fill='x',padx=24,ipady=5)
+            label = column.replace("_", " ").title()
+            tk.Label(window, text=label).pack(anchor="w", padx=15, pady=(8, 2))
+            value = tk.StringVar(value=(row[column] or "") if row else "")
+            fields[column] = value
+            ttk.Entry(window, textvariable=value).pack(fill="x", padx=15)
+
         def save():
             try:
-                ops.save_record(entity,{k:v.get() for k,v in fields.items()},row[pk] if row else None)
-            except (ValueError,sqlite3.Error) as error:
-                messagebox.showerror('Cannot save',str(error),parent=win)
+                data = {key: value.get() for key, value in fields.items()}
+                ops.save_record(entity, data, row[primary_key] if row else None)
+            except (ValueError, sqlite3.Error) as error:
+                self.show_error("Cannot Save", error, window)
                 return
-            win.destroy()
-            self.navigate(entity)
-        self.button(win,'Save',save,True).pack(fill='x',padx=24,pady=20)
+            window.destroy()
+            self.open_page(entity)
 
-    def transaction_form(self,entity):
-        sale = entity=='Sales'
-        people = ops.get_records('Employees' if sale else 'Suppliers')
+        self.button(window, "Save", save).pack(fill="x", padx=15, pady=12)
+
+    # ---------- Sales and purchase orders ----------
+
+    def transaction_form(self, entity):
+        is_sale = entity == "Sales"
+        people = ops.get_records("Employees" if is_sale else "Suppliers")
         products = ops.get_products()
+
         if not people or not products:
-            messagebox.showinfo('Missing records','Add products and an employee or supplier first.',parent=self)
+            messagebox.showinfo(
+                "Missing Records",
+                "Add products and an employee or supplier first."
+            )
             return
-        win = tk.Toplevel(self)
-        win.title('New Sale' if sale else 'New Purchase Order')
-        win.geometry('850x650')
-        win.configure(bg=BG)
-        win.transient(self)
-        win.grab_set()
-        people_map = {f"{r['employee_id']} • {r['first_name']} {r['last_name']}":r['employee_id'] for r in people} if sale else {f"{r['supplier_id']} • {r['supplier_name']}":r['supplier_id'] for r in people}
-        product_map = {f"{r['product_id']} • {r['product_name']}":r['product_id'] for r in products}
-        def combo(label,choices):
-            self.label(win,label).pack(anchor='w',padx=20,pady=(8,3))
-            var = tk.StringVar(value=next(iter(choices)))
-            ttk.Combobox(win,textvariable=var,values=list(choices),state='readonly').pack(fill='x',padx=20)
-            return var
-        person = combo('Employee' if sale else 'Supplier',people_map)
-        payment = combo('Payment Method',['Cash','Card','Other']) if sale else None
-        product = combo('Product',product_map)
-        quantity = tk.StringVar(value='1')
-        amount = tk.StringVar(value='0.00')
-        self.label(win,'Quantity').pack(anchor='w',padx=20,pady=(8,3))
-        ttk.Entry(win,textvariable=quantity).pack(fill='x',padx=20)
-        if not sale:
-            self.label(win,'Unit Cost').pack(anchor='w',padx=20,pady=(8,3))
-            ttk.Entry(win,textvariable=amount).pack(fill='x',padx=20)
+
+        window = tk.Toplevel(self)
+        window.title("New Sale" if is_sale else "New Purchase Order")
+        window.geometry("650x600")
+        window.transient(self)
+        window.grab_set()
+
+        if is_sale:
+            people_choices = {
+                f'{p["employee_id"]} - {p["first_name"]} {p["last_name"]}':
+                p["employee_id"] for p in people
+            }
+        else:
+            people_choices = {
+                f'{p["supplier_id"]} - {p["supplier_name"]}': p["supplier_id"]
+                for p in people
+            }
+
+        product_choices = {
+            f'{p["product_id"]} - {p["product_name"]}': p["product_id"]
+            for p in products
+        }
+
+        def dropdown(label, choices):
+            tk.Label(window, text=label).pack(anchor="w", padx=15, pady=(8, 2))
+            value = tk.StringVar(value=list(choices)[0])
+            ttk.Combobox(window, textvariable=value, values=list(choices),
+                         state="readonly").pack(fill="x", padx=15)
+            return value
+
+        person = dropdown("Employee" if is_sale else "Supplier", people_choices)
+        payment = dropdown("Payment Method", ["Cash", "Card", "Other"]) if is_sale else None
+        product = dropdown("Product", product_choices)
+
+        quantity = tk.StringVar(value="1")
+        tk.Label(window, text="Quantity").pack(anchor="w", padx=15, pady=(8, 2))
+        ttk.Entry(window, textvariable=quantity).pack(fill="x", padx=15)
+
+        cost = tk.StringVar(value="0.00")
+        if not is_sale:
+            tk.Label(window, text="Unit Cost").pack(anchor="w", padx=15, pady=(8, 2))
+            ttk.Entry(window, textvariable=cost).pack(fill="x", padx=15)
+
         items = []
-        tree = None
-        def add():
+        item_table = self.table(
+            window, ["Product ID", "Product", "Quantity", "Price/Cost"], [],
+            height=5
+        )
+
+        def add_item():
             try:
-                pid = product_map[product.get()]
-                qty = ops.integer(quantity.get(),'Quantity',1)
-                if not sale and any(i['product_id']==pid for i in items):
-                    raise ValueError('Each product may appear once per purchase order. Remove its row to change it.')
-                cost = ops.money(amount.get(),'Unit cost') if not sale else next(r['selling_price'] for r in products if r['product_id']==pid)
-                items.append({'product_id':pid,'quantity':qty,'quantity_ordered':qty,'unit_cost':cost})
-                tree.insert('','end',values=(pid,product.get().split(' • ',1)[1],qty,cost))
-            except (ValueError,KeyError) as error:
-                messagebox.showerror('Invalid item',str(error),parent=win)
-        self.button(win,'Add Item',add).pack(anchor='w',padx=20,pady=8)
-        tree = self.table(win,['Product ID','Product','Quantity','Unit Price' if sale else 'Unit Cost'],[],height=4)
-        def remove():
-            ids = tree.selection()
-            if ids:
-                index = tree.index(ids[0])
-                items.pop(index)
-                tree.delete(ids[0])
-        self.button(win,'Remove Selected Item',remove).pack(anchor='w',padx=20,pady=5)
-        tax = tk.StringVar(value='0.00')
-        if sale:
-            self.label(win,'Tax amount (enter explicitly)').pack(anchor='w',padx=20)
-            ttk.Entry(win,textvariable=tax).pack(fill='x',padx=20)
+                product_id = product_choices[product.get()]
+                qty = ops.integer(quantity.get(), "Quantity", 1)
+
+                if not is_sale and any(i["product_id"] == product_id for i in items):
+                    raise ValueError("This product is already in the order.")
+
+                price = (
+                    next(p["selling_price"] for p in products
+                         if p["product_id"] == product_id)
+                    if is_sale else ops.money(cost.get(), "Unit Cost")
+                )
+
+                items.append({
+                    "product_id": product_id,
+                    "quantity": qty,
+                    "quantity_ordered": qty,
+                    "unit_cost": price
+                })
+                item_table.insert("", "end", values=(
+                    product_id, product.get(), qty, price
+                ))
+            except (ValueError, KeyError) as error:
+                self.show_error("Invalid Item", error, window)
+
+        self.button(window, "Add Item", add_item).pack(pady=6)
+
+        def remove_item():
+            selected = item_table.selection()
+            if selected:
+                items.pop(item_table.index(selected[0]))
+                item_table.delete(selected[0])
+
+        self.button(window, "Remove Selected Item", remove_item).pack()
+
+        tax = tk.StringVar(value="0.00")
+        if is_sale:
+            tk.Label(window, text="Tax Amount").pack(anchor="w", padx=15, pady=(8, 2))
+            ttk.Entry(window, textvariable=tax).pack(fill="x", padx=15)
+
         def submit():
             try:
-                if sale:
-                    ops.create_sale(people_map[person.get()],payment.get(),items,tax.get())
-                else:
-                    ops.create_purchase_order(people_map[person.get()],items)
-            except (ValueError,sqlite3.Error) as error:
-                messagebox.showerror('Cannot save',str(error),parent=win)
-                return
-            win.destroy()
-            self.navigate(entity)
-        self.button(win,'Complete Sale' if sale else 'Create Order',submit,True).pack(fill='x',padx=20,pady=12)
+                if not items:
+                    raise ValueError("Add at least one item.")
 
-    def receive_form(self,order_id):
-        # Each entry records an additional quantity, so partial deliveries are supported.
-        rows = ops.get_line_items('Purchase Orders',order_id)
-        win = tk.Toplevel(self)
-        win.title(f'Receive Order #{order_id}')
-        win.geometry('650x440')
-        win.configure(bg=BG)
-        win.transient(self)
-        win.grab_set()
+                if is_sale:
+                    ops.create_sale(people_choices[person.get()],
+                                    payment.get(), items, tax.get())
+                else:
+                    ops.create_purchase_order(people_choices[person.get()], items)
+            except (ValueError, sqlite3.Error) as error:
+                self.show_error("Cannot Save", error, window)
+                return
+
+            window.destroy()
+            self.open_page(entity)
+
+        self.button(window, "Complete" if is_sale else "Create Order",
+                    submit).pack(fill="x", padx=15, pady=12)
+
+    def receive_selected(self, tree):
+        order_id = self.selected_record_id(tree)
+        if order_id is not None:
+            self.receive_form(order_id)
+
+    def cancel_order(self, tree):
+        order_id = self.selected_record_id(tree)
+        if order_id is None:
+            return
+        if not messagebox.askyesno("Cancel Order", "Cancel this order?"):
+            return
+        try:
+            ops.cancel_purchase_order(order_id)
+            self.open_page("Purchase Orders")
+        except (ValueError, sqlite3.Error) as error:
+            self.show_error("Cannot Cancel Order", error)
+
+    def receive_form(self, order_id):
+        rows = ops.get_line_items("Purchase Orders", order_id)
+        window = tk.Toplevel(self)
+        window.title(f"Receive Order #{order_id}")
+        window.geometry("500x450")
+        window.transient(self)
+        window.grab_set()
+
         fields = []
-        canvas = tk.Canvas(win,bg=BG,highlightthickness=0)
-        scroll = ttk.Scrollbar(win,orient='vertical',command=canvas.yview)
-        scroll.pack(side='right',fill='y')
-        canvas.pack(fill='both',expand=True)
-        canvas.configure(yscrollcommand=scroll.set)
-        inner = tk.Frame(canvas,bg=BG)
-        canvas.create_window((0,0),window=inner,anchor='nw')
-        inner.bind('<Configure>',lambda event:canvas.configure(scrollregion=canvas.bbox('all')))
         for row in rows:
-            self.label(inner,f"#{row['product_id']} {row['product_name']} — Remaining: {row['quantity_ordered']-row['quantity_received']}").pack(anchor='w',padx=20,pady=(12,3))
-            var = tk.StringVar(value='0')
-            ttk.Entry(inner,textvariable=var).pack(fill='x',padx=20)
-            fields.append((row['product_id'],var))
+            remaining = row["quantity_ordered"] - row["quantity_received"]
+            tk.Label(
+                window, text=f'{row["product_name"]} - Remaining: {remaining}'
+            ).pack(anchor="w", padx=15, pady=(8, 2))
+
+            value = tk.StringVar(value="0")
+            ttk.Entry(window, textvariable=value).pack(fill="x", padx=15)
+            fields.append((row["product_id"], value))
+
         def receive():
             try:
-                quantities = {pid:ops.integer(var.get(),'Quantity received') for pid,var in fields}
-                ops.receive_purchase_order(order_id,{pid:q for pid,q in quantities.items() if q>0})
-            except (ValueError,sqlite3.Error) as error:
-                messagebox.showerror('Cannot receive',str(error),parent=win)
+                quantities = {}
+                for product_id, value in fields:
+                    qty = ops.integer(value.get(), "Quantity received")
+                    if qty > 0:
+                        quantities[product_id] = qty
+                ops.receive_purchase_order(order_id, quantities)
+            except (ValueError, sqlite3.Error) as error:
+                self.show_error("Cannot Receive Stock", error, window)
                 return
-            win.destroy()
-            self.navigate('Purchase Orders')
-        self.button(win,'Receive Stock',receive,True).pack(fill='x',padx=20,pady=12)
 
-    def show_line_items(self,tree):
-        if not tree.selection():
-            messagebox.showinfo('Select a record','Choose a row first.',parent=self)
+            window.destroy()
+            self.open_page("Purchase Orders")
+
+        self.button(window, "Receive Stock", receive).pack(fill="x", padx=15, pady=12)
+
+    def show_line_items(self, tree):
+        record_id = self.selected_record_id(tree)
+        if record_id is None:
             return
-        record_id = tree.item(tree.selection()[0],'values')[0]
-        rows = ops.get_line_items(self.page,record_id)
-        names = ['line_number','product_name','quantity','unit_price','discount_amount'] if self.page=='Sales' else ['product_id','product_name','quantity_ordered','quantity_received','unit_cost']
-        win = tk.Toplevel(self)
-        win.title(f'{self.page} #{record_id} — Line Items')
-        win.geometry('900x400')
-        self.table(win,[n.replace('_',' ').title() for n in names],[tuple(r[n] for n in names) for r in rows])
+
+        rows = ops.get_line_items(self.page, record_id)
+        if self.page == "Sales":
+            columns = ["line_number", "product_name", "quantity",
+                       "unit_price", "discount_amount"]
+        else:
+            columns = ["product_id", "product_name", "quantity_ordered",
+                       "quantity_received", "unit_cost"]
+
+        window = tk.Toplevel(self)
+        window.title(f"{self.page} #{record_id} - Items")
+        window.geometry("800x350")
+        self.table(window, columns,
+                   [tuple(row[column] for column in columns) for row in rows])
 
 
 def main():
     try:
         ops.get_dashboard()
-    except (sqlite3.Error,RuntimeError) as error:
+    except (sqlite3.Error, RuntimeError) as error:
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror('Database not ready',f'{error}\n\nRun python init_retailDB.py from your project folder first.',parent=root)
+        messagebox.showerror(
+            "Database Not Ready",
+            f"{error}\n\nRun python init_retailDB.py first.",
+            parent=root
+        )
         root.destroy()
         return
+
     StoreApp().mainloop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
->>>>>>> 0fe9991a8a94e7dbba8f188f607820cd04a41ea1
