@@ -140,8 +140,12 @@ class StoreApp(tk.Tk):
         stock_box.bind("<<ComboboxSelected>>",
                        lambda event: self.load_inventory())
 
-        columns = ["ID", "Product Name", "Category", "Price",
-                   "In Stock", "Reorder At", "Status"]
+        columns = (
+            ["ID", "Barcode", "Product Name", "Category", "Selling Price"]
+            if self.page == "Products" else
+            ["ID", "Product Name", "Category", "Price",
+             "In Stock", "Reorder At", "Status"]
+        )
         self.products_table = self.table(self.content, columns, [])
         self.products_table.bind("<<TreeviewSelect>>", self.show_selection)
         self.products_table.bind("<Double-1>",
@@ -192,14 +196,21 @@ class StoreApp(tk.Tk):
             if self.stock.get() not in ("All Stock Levels", status):
                 continue
 
-            tree.insert("", "end", iid=str(r["product_id"]), values=(
-                r["product_id"], r["product_name"],
-                r["category_name"] or "Uncategorized",
-                f'${r["selling_price"]:.2f}',
-                qty if qty is not None else "-",
-                reorder if reorder is not None else "-",
-                status
-            ))
+            if self.page == "Products":
+                values = (
+                    r["product_id"], r["barcode"] or "-", r["product_name"],
+                    r["category_name"] or "Uncategorized",
+                    f'${r["selling_price"]:.2f}'
+                )
+            else:
+                values = (
+                    r["product_id"], r["product_name"],
+                    r["category_name"] or "Uncategorized",
+                    f'${r["selling_price"]:.2f}',
+                    qty if qty is not None else "-",
+                    reorder if reorder is not None else "-", status
+                )
+            tree.insert("", "end", iid=str(r["product_id"]), values=values)
 
         self.count_text.set(f"{len(tree.get_children())} products shown")
 
@@ -214,10 +225,13 @@ class StoreApp(tk.Tk):
         selected = self.products_table.selection()
         if selected:
             values = self.products_table.item(selected[0], "values")
-            self.selection_text.set(
-                f"Selected: {values[1]} | Stock: {values[4]} | "
-                f"Reorder at: {values[5]}"
-            )
+            if self.page == "Products":
+                self.selection_text.set(f"Selected: {values[2]}")
+            else:
+                self.selection_text.set(
+                    f"Selected: {values[1]} | Stock: {values[4]} | "
+                    f"Reorder at: {values[5]}"
+                )
 
     def edit_product(self):
         product_id = self.selected_product()
@@ -366,7 +380,7 @@ class StoreApp(tk.Tk):
 
         if entity in ops.ENTITIES:
             _, primary_key, columns = ops.ENTITIES[entity]
-            names = [primary_key] + columns
+            names = [primary_key, *columns]
             records = ops.get_records(entity)
         elif entity == "Sales":
             names = ["sale_id", "sale_datetime", "employee_id",
